@@ -1,0 +1,6 @@
+{
+  "name": "Font Parsing 字体解析系统",
+  "description": "基于 WebGL/ThreeJS 的地缘可用性及中日韩汉字多语言字形精细解析和实时渲染系统",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

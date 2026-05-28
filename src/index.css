@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+.scene-tooltip, 
+div.scene-tooltip, 
+.scene-container .scene-tooltip,
+.float-tooltip-kap, 
+div.float-tooltip-kap, 
+.scene-container .float-tooltip-kap {
+  background: rgba(0, 0, 0, 0) !important;
+  background-color: rgba(0, 0, 0, 0) !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
