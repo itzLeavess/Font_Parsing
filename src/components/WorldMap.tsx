@@ -27,6 +27,7 @@ interface WorldMapProps {
   onCountryClick?: (countryName: string) => void;
   viewMode?: "globe" | "flat";
   setViewMode?: (mode: "globe" | "flat") => void;
+  isReportEmbed?: boolean;
 }
 
 const COUNTRY_DB: Record<string, { zh: string; lang: string; status: string }> =
@@ -786,8 +787,9 @@ export default function WorldMap({
   onCountryClick,
   viewMode: controlledViewMode,
   setViewMode: controlledSetViewMode,
+  isReportEmbed = false,
 }: WorldMapProps) {
-  const [localViewMode, setLocalViewMode] = useState<"globe" | "flat">("globe");
+  const [localViewMode, setLocalViewMode] = useState<"globe" | "flat">(isReportEmbed ? "flat" : "globe");
   const [isControlPanelCollapsed, setIsControlPanelCollapsed] = useState(false);
   const [atlasResolution, setAtlasResolution] = useState<number>(110);
   const resolution = atlasResolution <= 80 ? "50m" : "110m";
@@ -1073,6 +1075,54 @@ export default function WorldMap({
       </div>
     `;
   };
+
+  if (isReportEmbed) {
+    return (
+      <div className="relative w-full h-[520px] flex items-center justify-center select-none overflow-hidden bg-transparent">
+        <ComposableMap
+          projection="geoMercator"
+          width={800}
+          height={520}
+          projectionConfig={{
+            scale: 112,
+            center: [11, 12]
+          }}
+          style={{ width: "100%", height: "100%", pointerEvents: "none" }}
+        >
+          <Geographies geography={countries}>
+            {({ geographies }) =>
+              geographies.map((geo) => {
+                return (
+                  <Geography
+                    key={geo.rsmKey}
+                    geography={geo}
+                    style={{
+                      default: {
+                        fill: getFlatPolygonColor(geo, false),
+                        outline: "none",
+                        stroke: "#e5e5e5",
+                        strokeWidth: 0.5,
+                      },
+                      hover: {
+                        fill: getFlatPolygonColor(geo, false),
+                        outline: "none",
+                        stroke: "#e5e5e5",
+                        strokeWidth: 0.5,
+                      },
+                      pressed: {
+                        fill: getFlatPolygonColor(geo, false),
+                        outline: "none",
+                      },
+                    }}
+                  />
+                );
+              })
+            }
+          </Geographies>
+        </ComposableMap>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-[600px] mb-8">

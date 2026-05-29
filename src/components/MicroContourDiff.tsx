@@ -9,7 +9,9 @@ import {
   MousePointer, 
   HelpCircle,
   Maximize2,
-  Columns
+  Columns,
+  Copy,
+  Check
 } from "lucide-react";
 
 interface MicroContourDiffProps {
@@ -72,6 +74,11 @@ export default function MicroContourDiff({
 
   const [baseColorHex, setBaseColorHex] = useState<string>("#3b82f6");
   const [compColorHex, setCompColorHex] = useState<string>("#ec4899");
+  
+  // Feedback state for clipboard
+  const [copied, setCopied] = useState(false);
+  const [copiedBase, setCopiedBase] = useState(false);
+  const [copiedComp, setCopiedComp] = useState(false);
   
   // Inspection coordinates hover state
   const [hoverCoord, setHoverCoord] = useState<{ x: number; y: number } | null>(null);
@@ -390,6 +397,38 @@ export default function MicroContourDiff({
 </svg>`;
   };
 
+  const handleCopyCompositeSVG = async () => {
+    const svgString = generateCompositeSVGString();
+    try {
+      await navigator.clipboard.writeText(svgString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy SVG: ", err);
+    }
+  };
+
+  const handleCopySingleSVG = async (type: "base" | "comp") => {
+    const isBase = type === "base";
+    const name = isBase ? baseFontName : compFontName;
+    const data = isBase ? baseGlyphsData : compGlyphsData;
+    const hex = isBase ? baseColorHex : compColorHex;
+    
+    const svgString = generateSingleSVGString(name, data, hex, 82);
+    try {
+      await navigator.clipboard.writeText(svgString);
+      if (isBase) {
+        setCopiedBase(true);
+        setTimeout(() => setCopiedBase(false), 2000);
+      } else {
+        setCopiedComp(true);
+        setTimeout(() => setCopiedComp(false), 2000);
+      }
+    } catch (err) {
+      console.error("Failed to copy SVG: ", err);
+    }
+  };
+
   const textLength = Math.max(1, characters.length);
 
   return (
@@ -645,35 +684,70 @@ export default function MicroContourDiff({
           {/* Export Assets / Vectors Section */}
           <div className="space-y-2.5 pt-4 border-t border-neutral-200/40">
             <span className="text-[10px] font-extrabold text-neutral-400 font-mono uppercase tracking-widest block font-bold">矢量资产导出</span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                disabled={baseGlyphsData.length === 0 || !baseFont}
-                onClick={() => triggerDownload(`string_base.svg`, generateSingleSVGString(baseFontName, baseGlyphsData, baseColorHex, 82))}
-                className="flex items-center justify-center gap-1 border border-neutral-200 bg-white hover:bg-neutral-50 text-[11px] font-bold text-neutral-700 py-2 rounded-md transition-all select-none cursor-pointer disabled:opacity-40"
-              >
-                <Download className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>基准 SVG</span>
-              </button>
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  disabled={baseGlyphsData.length === 0 || !baseFont}
+                  onClick={() => triggerDownload(`string_base.svg`, generateSingleSVGString(baseFontName, baseGlyphsData, baseColorHex, 82))}
+                  className="flex-1 flex items-center justify-center gap-1 border border-neutral-200 bg-white hover:bg-neutral-50 text-[11px] font-bold text-neutral-700 py-2 rounded-md transition-all select-none cursor-pointer disabled:opacity-40"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>基准 SVG</span>
+                </button>
+                <button
+                  disabled={baseGlyphsData.length === 0 || !baseFont}
+                  onClick={() => handleCopySingleSVG("base")}
+                  className="flex items-center justify-center px-3 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-md transition-all cursor-pointer disabled:opacity-40"
+                  title="复制基准 SVG 源码"
+                >
+                  {copiedBase ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5 text-neutral-400" />}
+                </button>
+              </div>
               
-              <button
-                disabled={compGlyphsData.length === 0 || !compFont}
-                onClick={() => triggerDownload(`string_compare.svg`, generateSingleSVGString(compFontName, compGlyphsData, compColorHex, 82))}
-                className="flex items-center justify-center gap-1 border border-neutral-200 bg-white hover:bg-neutral-50 text-[11px] font-bold text-neutral-700 py-2 rounded-md transition-all select-none cursor-pointer disabled:opacity-40"
-              >
-                <Download className="w-3.5 h-3.5 text-pink-500 shrink-0" />
-                <span>对比 SVG</span>
-              </button>
+              <div className="flex gap-2">
+                <button
+                  disabled={compGlyphsData.length === 0 || !compFont}
+                  onClick={() => triggerDownload(`string_compare.svg`, generateSingleSVGString(compFontName, compGlyphsData, compColorHex, 82))}
+                  className="flex-1 flex items-center justify-center gap-1 border border-neutral-200 bg-white hover:bg-neutral-50 text-[11px] font-bold text-neutral-700 py-2 rounded-md transition-all select-none cursor-pointer disabled:opacity-40"
+                >
+                  <Download className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                  <span>对比 SVG</span>
+                </button>
+                <button
+                  disabled={compGlyphsData.length === 0 || !compFont}
+                  onClick={() => handleCopySingleSVG("comp")}
+                  className="flex items-center justify-center px-3 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-md transition-all cursor-pointer disabled:opacity-40"
+                  title="复制对比 SVG 源码"
+                >
+                  {copiedComp ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5 text-neutral-400" />}
+                </button>
+              </div>
             </div>
 
             {layoutMode === "overlay" && (
-              <button
-                disabled={baseGlyphsData.length === 0 || compGlyphsData.length === 0 || !baseFont || !compFont}
-                onClick={() => triggerDownload(`string_overlay_composite.svg`, generateCompositeSVGString())}
-                className="w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-md transition-all select-none cursor-pointer shadow-2xs disabled:opacity-50"
-              >
-                <Layers className="w-4 h-4 shrink-0" />
-                <span>导出叠层 Composite SVG</span>
-              </button>
+              <div className="flex gap-2">
+                <button
+                  disabled={baseGlyphsData.length === 0 || compGlyphsData.length === 0 || !baseFont || !compFont}
+                  onClick={() => triggerDownload(`string_overlay_composite.svg`, generateCompositeSVGString())}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold py-2 px-3 rounded-md transition-all select-none cursor-pointer shadow-2xs disabled:opacity-50"
+                >
+                  <Layers className="w-3.5 h-3.5 shrink-0" />
+                  <span>导出叠层 Composite SVG</span>
+                </button>
+
+                <button
+                  disabled={baseGlyphsData.length === 0 || compGlyphsData.length === 0 || !baseFont || !compFont}
+                  onClick={handleCopyCompositeSVG}
+                  className="flex items-center justify-center px-3.5 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-md transition-all cursor-pointer disabled:opacity-50"
+                  title="复制叠层 SVG 源码"
+                >
+                  {copied ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-blue-600" />
+                  )}
+                </button>
+              </div>
             )}
           </div>
         </div>

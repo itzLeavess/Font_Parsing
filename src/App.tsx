@@ -57,11 +57,13 @@ import {
   ChevronRight,
   ArrowLeftRight,
   Download,
+  Github,
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import WorldMap from "./components/WorldMap";
 import MicroContourDiff from "./components/MicroContourDiff";
+import FontDetectionReport from "./components/FontDetectionReport";
 
 // Tailwind is imported in main.tsx via index.css
 
@@ -71,6 +73,8 @@ interface FontData {
   supportedChars: Set<number>;
   glyphCount: number;
   buffer?: ArrayBuffer;
+  fileSize?: number;
+  lastModified?: number;
 }
 
 export default function App() {
@@ -79,7 +83,8 @@ export default function App() {
   const [fontData, setFontData] = useState<FontData | null>(null);
 
   // App Navigation Tabs
-  const [activeTab, setActiveTab] = useState<"global" | "unicode" | "custom" | "diff">("global");
+  const [activeTab, setActiveTab] = useState<"global" | "unicode" | "custom" | "diff" | "report">("global");
+  const [unicodeOuterMode, setUnicodeOuterMode] = useState<"all" | "existing">("all");
 
   // Comparison (Diff) Tab State
   const [comparisonFontData, setComparisonFontData] = useState<FontData | null>(null);
@@ -950,7 +955,7 @@ export default function App() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-neutral-100">
             <div>
               <h2 className="text-sm font-bold font-mono tracking-wider text-neutral-800 uppercase flex items-center gap-2">
-                🔎 字体版本并集与其差异对比 (Diff)
+                🔎 字体版本对比
               </h2>
               <p className="text-xs text-neutral-400 mt-1 font-sans">
                 上传对比字体文件，系统自动计算码点集合关系，清晰呈现「基准独有 (左边独有)」、「两者共有 (重合字符)」与「对比独有 (右边独有)」集合。
@@ -1594,6 +1599,8 @@ export default function App() {
         supportedChars: result.supportedChars,
         glyphCount: result.glyphCount,
         buffer: result.buffer || undefined,
+        fileSize: file.size,
+        lastModified: file.lastModified,
       });
     }
 
@@ -1657,12 +1664,22 @@ export default function App() {
   }, [selectedBlockId]);
 
   const filteredBlocks = useMemo(() => {
-    if (!blockSearchQuery) return UNICODE_BLOCKS;
+    let result = UNICODE_BLOCKS;
+    if (unicodeOuterMode === "existing" && fontData) {
+      result = result.filter((block) => {
+        const chars = getCharsForBlock(block);
+        const assignedChars = chars.filter((c) => !isUnassigned(c));
+        return assignedChars.some((char) =>
+          fontData.supportedChars.has(char.codePointAt(0)!)
+        );
+      });
+    }
+    if (!blockSearchQuery) return result;
     const q = blockSearchQuery.toLowerCase();
-    return UNICODE_BLOCKS.filter(
+    return result.filter(
       (b) => b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q),
     );
-  }, [blockSearchQuery]);
+  }, [blockSearchQuery, unicodeOuterMode, fontData, isUnassigned]);
 
   const groupedUnicodeBlocks = useMemo(() => {
     const planes: Record<string, CharBlock[]> = {
@@ -3511,6 +3528,16 @@ export default function App() {
             >
               字体版本对比
             </button>
+            <button
+              onClick={() => setActiveTab("report")}
+              className={`cursor-pointer px-3 py-1.5 rounded text-xs font-bold font-mono transition-all duration-150 select-none ${
+                activeTab === "report"
+                  ? "bg-neutral-900 text-white font-bold"
+                  : "text-neutral-500 hover:text-neutral-900 bg-neutral-100/50 hover:bg-neutral-100"
+              }`}
+            >
+              字体检测报告
+            </button>
           </div>
         )}
       </header>
@@ -3577,6 +3604,7 @@ export default function App() {
                 <p className="text-neutral-400 leading-relaxed">无需后端，通过 opentype 原生虚拟化绘制 16 列字形高清矩阵</p>
               </div>
             </div>
+
           </div>
         )}
 
@@ -3621,6 +3649,11 @@ export default function App() {
 
             {/* Font Version Comparison View Tab */}
             {activeTab === "diff" && renderDiffView()}
+
+            {/* Font Detection Report View Tab */}
+            {activeTab === "report" && fontData && (
+              <FontDetectionReport fontData={fontData} parsedFont={parsedBaseFont} />
+            )}
 
             {(activeTab === "global" || activeTab === "unicode") && (
               <div className="relative z-[50] space-y-6">
@@ -3740,13 +3773,41 @@ export default function App() {
                 {activeTab === "unicode" && (
                   <div className="bg-white rounded-lg border border-neutral-200/85 flex flex-col max-h-[1200px] overflow-hidden">
               <div className="px-5 py-3 border-b border-neutral-100 bg-neutral-50/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-neutral-700 font-mono uppercase tracking-wider">
-                    Unicode 分区一览
-                  </h3>
-                  <span className="text-[10px] text-neutral-400 font-mono font-normal">
-                    ({filteredBlocks.length} / {UNICODE_BLOCKS.length})
-                  </span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-neutral-700 font-mono uppercase tracking-wider">
+                      Unicode 分区一览
+                    </h3>
+                    <span className="text-[10px] text-neutral-400 font-mono font-normal">
+                      ({filteredBlocks.length} / {UNICODE_BLOCKS.length})
+                    </span>
+                  </div>
+                  {fontData && (
+                    <div className="flex bg-neutral-100 p-0.5 rounded-md border border-neutral-200/80 text-[10px] font-sans font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setUnicodeOuterMode("all")}
+                        className={`cursor-pointer px-2 py-0.5 rounded transition-all ${
+                          unicodeOuterMode === "all"
+                            ? "bg-white text-neutral-800 font-bold shadow-3xs"
+                            : "text-neutral-400 hover:text-neutral-600"
+                        }`}
+                      >
+                        全部
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUnicodeOuterMode("existing")}
+                        className={`cursor-pointer px-2 py-0.5 rounded transition-all ${
+                          unicodeOuterMode === "existing"
+                            ? "bg-white text-neutral-800 font-bold shadow-3xs"
+                            : "text-neutral-400 hover:text-neutral-600"
+                        }`}
+                      >
+                        已有
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="relative w-full sm:w-48">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -4031,6 +4092,24 @@ export default function App() {
             )}
           </>
         )}
+
+        {/* GitHub Footer */}
+        <div className="mt-16 pt-8 border-t border-neutral-100 flex flex-col items-center gap-4 pb-12">
+          <a 
+            href="https://github.com/itzLeavess/Font_Parsing" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="group flex flex-col items-center gap-2 text-neutral-400 hover:text-neutral-900 transition-all duration-300"
+          >
+            <div className="p-2.5 rounded-full bg-neutral-50 group-hover:bg-neutral-100 border border-neutral-100 group-hover:border-neutral-200 transition-all">
+              <Github className="w-5 h-5 transition-transform group-hover:scale-110" />
+            </div>
+            <span className="text-[10px] font-bold font-mono uppercase tracking-widest">Open Source on GitHub</span>
+          </a>
+          <p className="text-[10px] text-neutral-300 font-mono">
+            © {new Date().getFullYear()} Font Parsing · Created by iTz_Leavess · All Rights Reserved
+          </p>
+        </div>
       </main>
 
       {/* Global Country/Language Details Modal */}
